@@ -1,0 +1,83 @@
+import User from "../models/user.model.js"
+import { errorHandler } from "../ultis/error.js"
+import { CONFLICT, NOT_FOUND, OK, SALT_ROUNDS, UNAUTHORIZED } from "../constants/http.js"
+import bcrypt from "bcrypt"
+import { validateAuth } from "../ultis/validateAuth.js"
+import jwt from "jsonwebtoken"
+import { JWT_SECRET, NODE_ENV } from "../constants/env.js"
+
+export const signup = async (req, res, next) => {
+  try {
+      // 1. Lấy thông tin từ body
+    const { email, password } = req.body
+
+    // 2. Validate thông tin
+    validateAuth(email, password, next)
+
+    // 3. Kiểm tra xem user đã tồn tại chưa
+    const user = await User.findOne({ email })
+    if (user)
+      return next(errorHandler(CONFLICT, "User already exists"))
+
+    // 4. Hash password
+    const salt = await bcrypt.genSalt(SALT_ROUNDS)
+    const hashedPassword = await bcrypt.hash(password, salt)
+
+    // 5. Tạo user mới
+    const newUser = new User({ 
+      email: email, 
+      password: hashedPassword 
+    })
+    await newUser.save()
+
+    res.status(OK).json({
+      success: true,
+      statusCode: OK,
+      message: "User created successfully",
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const signin = async (req, res, next) => {
+  try {
+    // 1. Lấy thông tin từ body
+    const { email, password } = req.body
+
+    // 2. Validate thông tin
+    validateAuth(email, password, next)
+
+    // 3. Kiểm tra xem user đã tồn tại chưa
+    const user = await User.findOne({ email })
+    if (!user)
+      return next(errorHandler(NOT_FOUND, "Incorrect account or password"))
+
+    // 4. So sánh password
+    const isPasswordCorrect = await bcrypt.compare(password, user.password)
+    if (!isPasswordCorrect)
+      return next(errorHandler(UNAUTHORIZED, "Incorrect account or password"))
+
+    // 5. Tạo token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "10m" }
+    )
+
+    res.status(OK).cookie("accessToken", token, {
+      httpOnly: true,
+      secure: NODE_ENV === "production",
+      maxAge: 10 * 60 * 1000,
+    }).json({
+      success: true,
+      statusCode: OK,
+      message: "User signed in successfully",
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// accessToken
+// refreshToken
