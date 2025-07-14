@@ -1,5 +1,6 @@
-export const PORT = process.env.PORT || 4004
-export const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:3001'
-export const NODE_ENV = process.env.NODE_ENV || 'development'
-export const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/camera'
-export const JWT_SECRET = process.env.JWT_SECRET || 'asdasd'
+export const PORT = process.env.PORT
+export const APP_ORIGIN = process.env.APP_ORIGIN
+export const NODE_ENV = process.env.NODE_ENV
+export const MONGO_URI = process.env.MONGO_URI
+export const JWT_SECRET = process.env.JWT_SECRET
+export const JWT_REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_TOKEN_SECRET

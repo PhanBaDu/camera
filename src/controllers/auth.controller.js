@@ -1,10 +1,12 @@
 import User from '../models/user.model.js'
+import Session from '../models/session.model.js'
 import { errorHandler } from '../ultis/error.js'
 import { CONFLICT, NOT_FOUND, OK, SALT_ROUNDS, UNAUTHORIZED } from '../constants/http.js'
 import bcrypt from 'bcrypt'
 import { validateAuth } from '../ultis/validateAuth.js'
 import jwt from 'jsonwebtoken'
-import { JWT_SECRET, NODE_ENV } from '../constants/env.js'
+import { JWT_REFRESH_TOKEN_SECRET, JWT_SECRET, NODE_ENV } from '../constants/env.js'
+import { fifteenMinutesFromNow, thirtyDaysFromNow } from '../ultis/date.js'
 
 export const signup = async (req, res, next) => {
   try {
@@ -43,6 +45,7 @@ export const signin = async (req, res, next) => {
   try {
     // 1. Lấy thông tin từ body
     const { email, password } = req.body
+    const userAgent = req.headers['user-agent']
 
     // 2. Validate thông tin
     validateAuth(email, password, next)
@@ -55,15 +58,35 @@ export const signin = async (req, res, next) => {
     const isPasswordCorrect = await bcrypt.compare(password, user.password)
     if (!isPasswordCorrect) return next(errorHandler(UNAUTHORIZED, 'Incorrect account or password'))
 
-    // 5. Tạo token
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '10m' })
+    // 5. Tạo session
+    // const session = new Session({
+    //   userId: user._id,
+    //   userAgent: req.headers['user-agent']
+    // })
+    // await session.save()
+    const session = await Session.create({
+      userId: user._id,
+      userAgent: req.headers['user-agent']
+    })
+
+    // 6. Tạo token
+    const accessToken = jwt.sign({ userId: user._id, role: user.role, sessionId: session._id }, JWT_SECRET, {
+      expiresIn: '30s'
+    })
+    const refreshToken = jwt.sign({ sessionId: session._id }, JWT_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })
 
     res
       .status(OK)
-      .cookie('accessToken', token, {
+      .cookie('accessToken', accessToken, {
+        httpOnly: true,
+        secure: NODE_ENV === 'production', // dev = false ==> product = true
+        expires: fifteenMinutesFromNow()
+      })
+      .cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: NODE_ENV === 'production',
-        maxAge: 10 * 60 * 1000
+        expires: thirtyDaysFromNow(),
+        path: '/api/auth/refresh'
       })
       .json({
         success: true,
