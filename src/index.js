@@ -24,7 +24,7 @@ app.use(helmet.crossOriginResourcePolicy({ policy: 'cross-origin' }))
 app.use(morgan('dev'))
 app.use(cookieParser())
 
-app.use("/api/auth", authRoutes)
+app.use('/api/auth', authRoutes)
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || INTERNAL_SERVER_ERROR
