@@ -10,6 +10,7 @@ import { APP_ORIGIN, NODE_ENV, PORT } from './constants/env.js'
 import { INTERNAL_SERVER_ERROR, LABEL_INTERNAL_SERVER_ERROR } from './constants/http.js'
 import authRoutes from './routes/auth.route.js'
 import userRoutes from './routes/user.route.js'
+import productRoutes from './routes/product.route.js'
 
 const app = express()
 app.use(
@@ -27,6 +28,7 @@ app.use(cookieParser())
 
 app.use('/api/auth', authRoutes)
 app.use('/api/user', userRoutes)
+app.use('/api/product', productRoutes)
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || INTERNAL_SERVER_ERROR

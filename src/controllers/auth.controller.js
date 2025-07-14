@@ -71,7 +71,7 @@ export const signin = async (req, res, next) => {
 
     // 6. Tạo token
     const accessToken = jwt.sign({ userId: user._id, role: user.role, sessionId: session._id }, JWT_SECRET, {
-      expiresIn: '30s'
+      expiresIn: '15m'
     })
     const refreshToken = jwt.sign({ sessionId: session._id }, JWT_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })
 
@@ -93,6 +93,66 @@ export const signin = async (req, res, next) => {
         statusCode: OK,
         message: 'User signed in successfully'
       })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const refreshToken = async (req, res, next) => {
+  try {
+    const refreshToken = req.cookies.refreshToken
+    if (!refreshToken) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_TOKEN_SECRET)
+    if (!decoded) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+
+    const session = await Session.findById(decoded.sessionId)
+    if (!session) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+
+    const now = Math.floor(Date.now() / 1000)
+    if (decoded.exp < now) return next(errorHandler(UNAUTHORIZED, 'Session expired'))
+
+    // ---
+    // 1. Tạo newToken
+    const newAccessToken = jwt.sign({ userId: req.userId, role: req.role, sessionId: session._id }, JWT_SECRET, {
+      expiresIn: '15m'
+    })
+    // 2. Tạo newRefreshToken
+    const newRefreshToken = jwt.sign({ sessionId: session._id }, JWT_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })
+
+    res
+      .status(OK)
+      .cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: NODE_ENV === 'production', // dev = false ==> product = true
+        expires: fifteenMinutesFromNow()
+      })
+      .cookie('refreshToken', newRefreshToken, {
+        httpOnly: true,
+        secure: NODE_ENV === 'production',
+        expires: thirtyDaysFromNow(),
+        path: '/api/auth/refresh'
+      })
+      .json({
+        success: true,
+        statusCode: OK,
+        message: 'New access token successfully'
+      })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const logout = async (req, res, next) => {
+  try {
+    await Session.findByIdAndDelete(req.sessionId)
+    res.clearCookie('accessToken')
+    res.clearCookie('refreshToken')
+    res.status(OK).json({
+      success: true,
+      statusCode: OK,
+      message: 'User logged out successfully'
+    })
   } catch (error) {
     next(error)
   }
