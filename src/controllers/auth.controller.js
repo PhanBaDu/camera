@@ -71,7 +71,7 @@ export const signin = async (req, res, next) => {
 
     // 6. Tạo token
     const accessToken = jwt.sign({ userId: user._id, role: user.role, sessionId: session._id }, JWT_SECRET, {
-      expiresIn: '15m'
+      expiresIn: '20s'
     })
     const refreshToken = jwt.sign({ sessionId: session._id }, JWT_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })
 
@@ -115,7 +115,7 @@ export const refreshToken = async (req, res, next) => {
     // ---
     // 1. Tạo newToken
     const newAccessToken = jwt.sign({ userId: req.userId, role: req.role, sessionId: session._id }, JWT_SECRET, {
-      expiresIn: '15m'
+      expiresIn: '20s'
     })
     // 2. Tạo newRefreshToken
     const newRefreshToken = jwt.sign({ sessionId: session._id }, JWT_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })

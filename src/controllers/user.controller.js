@@ -3,13 +3,11 @@ import User from '../models/user.model.js'
 
 export const findUserId = async (req, res, next) => {
   try {
-    const { id } = req.params
-    const user = await User.findById(id)
-    const { password, ...rest } = user._doc
+    const user = await User.findById(req.userId)
     res.status(OK).json({
       success: true,
       statusCode: OK,
-      data: rest
+      data: user
     })
   } catch (error) {
     next(error)
