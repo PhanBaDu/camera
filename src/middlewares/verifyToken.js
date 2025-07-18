@@ -8,25 +8,21 @@ import User from '../models/user.model.js'
 export const verifyToken = async (req, res, next) => {
   try {
     const accessToken = req.cookies.accessToken
-    if (!accessToken) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+    if (!accessToken) return next(errorHandler(UNAUTHORIZED, 'Missing access token'))
 
     const decoded = jwt.verify(accessToken, JWT_SECRET)
-    if (!decoded) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
-
-    const now = Math.floor(Date.now() / 1000)
-    if (decoded.exp < now) return next(errorHandler(UNAUTHORIZED, 'Session expired'))
 
     const session = await Session.findById(decoded.sessionId)
-    if (!session) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+    if (!session) return next(errorHandler(UNAUTHORIZED, 'Invalid session'))
 
     const user = await User.findById(session.userId)
-    if (!user) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+    if (!user) return next(errorHandler(UNAUTHORIZED, 'Invalid user'))
 
     req.sessionId = session._id
     req.userId = session.userId
     req.role = user.role
     next()
   } catch (error) {
-    next(error)
+    return next(errorHandler(UNAUTHORIZED, error.message === 'jwt expired' ? 'Token expired' : 'Invalid token'))
   }
 }

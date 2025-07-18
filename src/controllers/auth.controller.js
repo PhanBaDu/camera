@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt'
 import { validateAuth } from '../ultis/validateAuth.js'
 import jwt from 'jsonwebtoken'
 import { JWT_REFRESH_TOKEN_SECRET, JWT_SECRET, NODE_ENV } from '../constants/env.js'
-import { fifteenMinutesFromNow, thirtyDaysFromNow } from '../ultis/date.js'
+import { fifteenMinutesFromNow, ONE_DAY_MS, thirtyDaysFromNow } from '../ultis/date.js'
 
 export const signup = async (req, res, next) => {
   try {
@@ -66,7 +66,7 @@ export const signin = async (req, res, next) => {
     // await session.save()
     const session = await Session.create({
       userId: user._id,
-      userAgent: req.headers['user-agent']
+      userAgent: userAgent
     })
 
     // 6. Tạo token
@@ -101,17 +101,21 @@ export const signin = async (req, res, next) => {
 export const refreshToken = async (req, res, next) => {
   try {
     const refreshToken = req.cookies.refreshToken
-    if (!refreshToken) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+    if (!refreshToken) return next(errorHandler(UNAUTHORIZED, 'Missing refresh token'))
 
     const decoded = jwt.verify(refreshToken, JWT_REFRESH_TOKEN_SECRET)
-    if (!decoded) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
 
     const session = await Session.findById(decoded.sessionId)
-    if (!session) return next(errorHandler(UNAUTHORIZED, 'Unauthorized'))
+    if (!session) return next(errorHandler(UNAUTHORIZED, 'Invalid session'))
 
-    const now = Math.floor(Date.now() / 1000)
-    if (decoded.exp < now) return next(errorHandler(UNAUTHORIZED, 'Session expired'))
+    const now = Date.now()
+    if (session.expiresAt.getTime() <= now) return next(errorHandler(UNAUTHORIZED, 'Session expired'))
 
+    const sessionNeedsRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS
+    if (sessionNeedsRefresh) {
+      session.expiresAt = thirtyDaysFromNow()
+      await session.save()
+    }
     // ---
     // 1. Tạo newToken
     const newAccessToken = jwt.sign({ userId: req.userId, role: req.role, sessionId: session._id }, JWT_SECRET, {
@@ -139,7 +143,9 @@ export const refreshToken = async (req, res, next) => {
         message: 'New access token successfully'
       })
   } catch (error) {
-    next(error)
+    next(
+      errorHandler(UNAUTHORIZED, error.message === 'jwt expired' ? 'Refresh token expired' : 'Invalid refresh token')
+    )
   }
 }
 
@@ -147,7 +153,7 @@ export const logout = async (req, res, next) => {
   try {
     await Session.findByIdAndDelete(req.sessionId)
     res.clearCookie('accessToken')
-    res.clearCookie('refreshToken')
+    res.clearCookie('refreshToken', { path: '/api/auth/refresh' })
     res.status(OK).json({
       success: true,
       statusCode: OK,

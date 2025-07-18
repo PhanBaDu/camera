@@ -28,7 +28,6 @@ app.use(cookieParser())
 
 app.use('/api/auth', authRoutes)
 app.use('/api/user', userRoutes)
-app.use('/api/product', productRoutes)
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || INTERNAL_SERVER_ERROR
